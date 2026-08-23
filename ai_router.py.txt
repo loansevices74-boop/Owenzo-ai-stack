@@ -1,0 +1,71 @@
+import os, time, csv, datetime, requests
+from dotenv import load_dotenv
+load_dotenv()
+
+def _key(name):
+    v = os.getenv(name, "")
+    if v:
+        return v
+    try:
+        import streamlit as st
+        return str(st.secrets.get(name, ""))
+    except Exception:
+        return ""
+
+PROVIDERS = [
+    {"name": "gemini",
+     "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+     "key": _key("GEMINI_API_KEY"), "model": "gemini-2.5-flash"},
+    {"name": "groq",
+     "url": "https://api.groq.com/openai/v1/chat/completions",
+     "key": _key("GROQ_API_KEY"), "model": "llama-3.3-70b-versatile"},
+    {"name": "openrouter",
+     "url": "https://openrouter.ai/api/v1/chat/completions",
+     "key": _key("OPENROUTER_API_KEY"), "model": "qwen/qwen3-coder:free"},
+]
+
+def _log(provider, status, secs):
+    try:
+        with open("ai_usage.csv", "a", newline="") as f:
+            csv.writer(f).writerow([datetime.datetime.now().isoformat(), provider, status, round(secs, 2)])
+    except Exception:
+        pass
+
+def call_provider(p, messages, timeout=60):
+    r = requests.post(p["url"],
+                      headers={"Authorization": f"Bearer {p['key']}"},
+                      json={"model": p["model"], "messages": messages, "temperature": 0.7},
+                      timeout=timeout)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
+
+def chat(prompt, system="You are a helpful assistant."):
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+    errors = []
+    for p in PROVIDERS:
+        if not p["key"]:
+            continue
+        for _ in range(2):
+            t0 = time.time()
+            try:
+                text = call_provider(p, messages)
+                _log(p["name"], "OK", time.time() - t0)
+                return {"provider": p["name"], "text": text}
+            except requests.exceptions.HTTPError as e:
+                code = e.response.status_code if e.response is not None else 0
+                log(p["name"], f"HTTP{code}", time.time() - t0)
+                errors.append(f"{p['name']}: HTTP {code}")
+                if code in (401, 403):
+                    break
+                time.sleep(2)
+            except Exception as e:
+                _log(p["name"], "ERR", time.time() - t0)
+                errors.append(f"{p['name']}: {e}")
+                time.sleep(1)
+    raise RuntimeError("All providers failed | " + " | ".join(errors))
+
+def safe_chat(prompt, system="You are a helpful assistant.", fallback="AI temporarily unavailable."):
+    try:
+        return chat(prompt, system)
+    except Exception:
+        return {"provider": "fallback", "text": fallback}
