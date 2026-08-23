@@ -1,0 +1,21 @@
+import os, telebot
+from dotenv import load_dotenv
+from ai_router import safe_chat
+load_dotenv()
+
+bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
+
+@bot.message_handler(commands=["start"])
+def start(m):
+    bot.reply_to(m, "⚡ Owenzo AI Analyst online. Send any match line or invoice text.")
+
+@bot.message_handler(func=lambda m: True)
+def analyze(m):
+    out = safe_chat(f"Give a short 3-line analysis:\n{m.text}",
+                    system="You are a precise sports & data analyst. Be concise.",
+                    fallback="⚠️ AI temporarily unavailable. Try again shortly.")
+    bot.reply_to(m, f"🤖 [{out['provider']}] {out['text']}")
+
+if _name_ == "_main_":
+    print("Bot running...")
+    bot.infinity_polling()
