@@ -1,0 +1,4 @@
+from ai_router import chat, PROVIDERS
+print("Active providers:", [p["name"] for p in PROVIDERS if p["key"]])
+out = chat("Reply with exactly: ROUTER OK")
+print("Served by:", out["provider"], "|", out["text"])
