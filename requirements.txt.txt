@@ -1,0 +1,7 @@
+requests
+python-dotenv
+streamlit
+pandas
+fpdf2
+pyTelegramBotAPI
+openpyxl
