@@ -63,7 +63,8 @@ if status == "PASS":
 
     if st.button("📄 Generate PDF Design Report"):
         ai = safe_chat(f"4-line engineering summary: load {design_w:.0f}W, Ib {ib:.1f}A, MCB {breaker}A, cable {cable}mm2, v-drop {vd_pct:.2f}%",
-                       system="You are a COREN-registered electrical engineer writing a client report.")
+                       system="You are a COREN-registered electrical engineer writing a client report.",
+                       fallback="Design verified against BS 7671 copper PVC cable tables. All results within regulatory limits.")
         pdf = FPDF(); pdf.add_page()
         pdf.set_font("Helvetica", "B", 16); pdf.cell(0, 10, "WireSafe Design Report"); pdf.ln(12)
         pdf.set_font("Helvetica", "", 11)
