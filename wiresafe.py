@@ -71,7 +71,7 @@ if status == "PASS":
         pdf.multi_cell(0, 6, f"Engineer: Owens U. Oriaikhi (COREN R72198)\n"
             f"Phases {phases} | PF {pf} | Length {length_m}m | Ib {ib:.1f}A\n"
             f"MCB {breaker}A | Cable {cable}mm2 | V-drop {vd_pct:.2f}%\n\n"
-            f"AI Summary [{ai['provider']}]:\n{ai['text']}\n\n"
+            f"Engineering Summary:\n{ai['text']}\n\n"
             "Disclaimer: Design aid - final verification by a COREN-registered engineer required.")
         tmp_path = "/tmp/WireSafe_Report.pdf"
         pdf.output(tmp_path)
