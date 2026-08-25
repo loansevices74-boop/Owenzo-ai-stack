@@ -1,0 +1,33 @@
+import streamlit as st, pandas as pd
+from ai_router import safe_chat
+
+st.set_page_config(page_title="OpsRecon", layout="wide")
+st.title("🚛 OpsRecon — Vendor Invoice Reconciliation")
+st.caption("By Owens U. Oriaikhi | 8 yrs cross-border logistics ops (Nigeria, India, South Sudan)")
+
+po = pd.DataFrame({"PO_ID": ["PO-101","PO-102","PO-103","PO-104","PO-105"],
+    "Vendor": ["Vendor A (India)","Vendor B (India)","Vendor C (NG)","Vendor A (India)","Vendor D (CN)"],
+    "Qty_PO": [500,20,120,300,10], "Amount_PO": [25000,48000,36000,15000,55000]})
+inv = pd.DataFrame({"PO_ID": ["PO-101","PO-102","PO-103","PO-104","PO-105"],
+    "Qty_INV": [500,20,110,300,12], "Amount_INV": [25000,52800,33000,15750,60500]})
+
+up = st.file_uploader("Upload real invoices (CSV/XLSX with PO_ID, Qty_INV, Amount_INV)", type=["csv","xlsx"])
+if up:
+    inv = pd.read_csv(up) if up.name.endswith(".csv") else pd.read_excel(up)
+
+r = po.merge(inv, on="PO_ID")
+r["Qty_Var"] = r["Qty_INV"] - r["Qty_PO"]
+r["Amt_Var"] = r["Amount_INV"] - r["Amount_PO"]
+r["Status"] = ["🚨 FLAG" if (q or a) else "✅" for q, a in zip(r["Qty_Var"], r["Amt_Var"])]
+flagged = r[r["Status"] == "🚨 FLAG"]
+
+c1, c2, c3 = st.columns(3)
+c1.metric("Processed", len(r)); c2.metric("Flagged", len(flagged))
+c3.metric("Overcharge Risk $", f"{int(flagged['Amt_Var'].clip(lower=0).sum()):,}")
+
+st.dataframe(r, use_container_width=True)
+
+if st.button("🧠 AI Exception Summary for Management"):
+    s = safe_chat(f"3-bullet manager summary of these discrepancies:\n{flagged.to_string()}",
+                  system="You are a senior logistics operations manager.")
+    st.write(f"*[{s['provider']}]* {s['text']}")
