@@ -72,7 +72,8 @@ if status == "PASS":
             f"MCB {breaker}A | Cable {cable}mm2 | V-drop {vd_pct:.2f}%\n\n"
             f"AI Summary [{ai['provider']}]:\n{ai['text']}\n\n"
             "Disclaimer: Design aid - final verification by a COREN-registered engineer required.")
-        pdf.output("WireSafe_Report.pdf")
-        st.success("Saved WireSafe_Report.pdf")
+        st.download_button("📥 Download PDF Design Report", data=pdf.output(),
+                           file_name="WireSafe_Report.pdf", mime="application/pdf")
+        st.success("Report ready — click the Download button below.")
 else:
     st.error("❌ No suitable cable — reduce load/length or split circuits.")
