@@ -6,11 +6,10 @@ from ai_router import safe_chat
 st.set_page_config(page_title="WireSafe", page_icon="⚡", layout="wide")
 
 # ============================================================
-# PDF REPORT GENERATOR (defined first — used by the UI below)
+# PDF REPORT — no classes, just functions (4-space indent only)
 # ============================================================
 
 def _bs_ref(field):
- """BS 7671 table reference for a given design field."""
  refs = {
  "mcb": "Table 41.3 / Appendix 3",
  "cable": "Table 4E1B (Cu/PVC)",
@@ -19,32 +18,22 @@ def _bs_ref(field):
  }
  return refs.get(field, "BS 7671")
 
+def _draw_header(pdf, project, client, rpt_date):
+ pdf.set_font("Helvetica", "B", 14)
+ pdf.cell(0, 8, "WireSafe Design Report", ln=1, align="C")
+ pdf.set_font("Helvetica", "", 9)
+ pdf.cell(0, 5, f"Project: {project} | Client: {client} | Date: {rpt_date}", ln=1, align="C")
+ pdf.ln(2)
+ pdf.set_draw_color(120, 120, 120)
+ pdf.line(10, 25, 200, 25)
+ pdf.ln(4)
 
-class _WireSafePDF(FPDF):
- """Custom FPDF with header (project/client/date) + footer (page numbers)."""
-
- def header(self):
- self.set_font("Helvetica", "B", 14)
- self.cell(0, 8, "WireSafe Design Report", ln=1, align="C")
- self.set_font("Helvetica", "", 9)
- self.cell(0, 5,
- f"Project: {self.project} | Client: {self.client} | Date: {self.rpt_date}",
- ln=1, align="C")
- self.ln(2)
- self.set_draw_color(120, 120, 120)
- self.line(10, 25, 200, 25)
- self.ln(4)
-
- def footer(self):
- self.set_y(-12)
- self.set_font("Helvetica", "", 8)
- self.cell(0, 5,
- f"Owens U. Oriaikhi (COREN R72198) | WireSafe Design Aid | Page {self.page_no()}",
- align="C")
-
+def _draw_footer(pdf):
+ pdf.set_y(-12)
+ pdf.set_font("Helvetica", "", 8)
+ pdf.cell(0, 5, f"Owens U. Oriaikhi (COREN R72198) | WireSafe Design Aid | Page {pdf.page_no()}", align="C")
 
 def _draw_kv_table(pdf, rows, col_w=(90, 100)):
- """2-column key/value table for Design Inputs."""
  pdf.set_fill_color(230, 230, 230)
  pdf.cell(col_w[0], 6, "Parameter", border=1, fill=True)
  pdf.cell(col_w[1], 6, "Value", border=1, fill=True, ln=1)
@@ -52,9 +41,7 @@ def _draw_kv_table(pdf, rows, col_w=(90, 100)):
  pdf.cell(col_w[0], 6, k, border=1)
  pdf.cell(col_w[1], 6, v, border=1, ln=1)
 
-
 def _draw_results_table(pdf, rows, col_w=(45, 40, 55, 50)):
- """4-column results table: Item | Value | BS 7671 Ref | Status."""
  pdf.set_fill_color(230, 230, 230)
  headers = ["Item", "Value", "BS 7671 Ref", "Status"]
  for i, h in enumerate(headers):
@@ -67,9 +54,7 @@ def _draw_results_table(pdf, rows, col_w=(45, 40, 55, 50)):
  mark = "[x]" if status in ("PASS", "APPLIED") else "[ ]"
  pdf.cell(col_w[3], 6, f"{mark} {status}", border=1, ln=1)
 
-
 def _draw_boq_table(pdf, boq_df, col_w=(80, 25, 20, 65)):
- """4-column BOQ table: Item | Qty | Unit | Total (NGN)."""
  pdf.set_fill_color(230, 230, 230)
  headers = ["Item", "Qty", "Unit", "Total (NGN)"]
  for i, h in enumerate(headers):
@@ -81,17 +66,15 @@ def _draw_boq_table(pdf, boq_df, col_w=(80, 25, 20, 65)):
  pdf.cell(col_w[2], 6, str(row["Unit"]), border=1)
  pdf.cell(col_w[3], 6, f"{int(row['Total (NGN)']):,}", border=1, align="R", ln=1)
 
-
 def _build_report(phases, pf, ca, cg, vd_limit, length_m,
  total_w, design_w, ib, breaker, cable, vd_pct,
  boq_df, eng_summary, project, client, rpt_date):
- """Build the upgraded PDF and return raw bytes for st.download_button."""
-
- pdf = _WireSafePDF()
- pdf.project = project or "—"
- pdf.client = client or "—"
- pdf.rpt_date = str(rpt_date) if rpt_date else "—"
+ pdf = FPDF()
  pdf.add_page()
+ _p = project or "—"
+ _c = client or "—"
+ _d = str(rpt_date) if rpt_date else "—"
+ _draw_header(pdf, _p, _c, _d)
 
  # 1. Design Inputs
  pdf.set_font("Helvetica", "B", 11)
@@ -153,8 +136,8 @@ def _build_report(phases, pf, ca, cg, vd_limit, length_m,
  "Final verification and sign-off must be performed by a COREN-registered "
  "engineer before installation.")
 
+ _draw_footer(pdf)
  return pdf.output()
-
 
 # ============================================================
 # STREAMLIT UI
@@ -163,15 +146,13 @@ def _build_report(phases, pf, ca, cg, vd_limit, length_m,
 st.title("⚡ WireSafe — Electrical Wiring Design")
 st.caption("By Owens U. Oriaikhi | COREN Reg. No: R72198")
 
-# BS 7671 copper PVC: size -> (ampacity A, mV/A/m)
 CABLES = {1.5:(20,29), 2.5:(27,18), 4:(36,11), 6:(46,7.3), 10:(62,4.4),
  16:(80,2.8), 25:(101,1.75), 35:(126,1.25), 50:(151,0.93),
  70:(192,0.63), 95:(232,0.47), 120:(269,0.38)}
 BREAKERS = [6,10,16,20,25,32,40,50,63,80,100,125,160,200,250,315,400]
 PRICE_M = {1.5:350, 2.5:550, 4:900, 6:1300, 10:2200, 16:3400, 25:5300,
- 35:7400, 50:10500, 70:14800, 95:20000, 120:25000} # NGN/m placeholders
+ 35:7400, 50:10500, 70:14800, 95:20000, 120:25000}
 
-# ---- Sidebar: Design Inputs ----
 st.sidebar.header("Design Inputs")
 phases = st.sidebar.selectbox("Phases", [1, 3])
 pf = st.sidebar.slider("Power factor", 0.7, 1.0, 0.9)
@@ -179,14 +160,12 @@ ca = st.sidebar.slider("Ambient correction Ca", 0.7, 1.0, 1.0)
 cg = st.sidebar.slider("Grouping correction Cg", 0.7, 1.0, 1.0)
 vd_limit = st.sidebar.selectbox("V-drop limit %", [3.0, 4.0, 5.0], index=1)
 
-# ---- Sidebar: Project details (NEW) ----
 st.sidebar.markdown("---")
 st.sidebar.header("Report Details")
 project_name = st.sidebar.text_input("Project name", value="", key="ws_project")
 client_name = st.sidebar.text_input("Client name", value="", key="ws_client")
 report_date = st.sidebar.date_input("Report date", value=date.today(), key="ws_date")
 
-# ---- Load schedule ----
 st.subheader("Load Schedule")
 loads = st.data_editor(pd.DataFrame([
  {"Device": "Lighting", "Watts": 500, "Qty": 10},
@@ -196,7 +175,6 @@ loads = st.data_editor(pd.DataFrame([
 length_m = st.number_input("Circuit run length (m)", 1, 500, 30)
 demand = st.slider("Demand factor %", 50, 100, 80)
 
-# ---- Calculations ----
 total_w = float((loads["Watts"] * loads["Qty"]).sum())
 design_w = total_w * demand / 100
 v = 230 if phases == 1 else 400
@@ -212,7 +190,6 @@ if breaker:
  cable, vd_pct, status = size, vd, "PASS"
  break
 
-# ---- Metrics ----
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Connected Load (W)", f"{total_w:,.0f}")
 c2.metric("Design Load (W)", f"{design_w:,.0f}")
@@ -230,7 +207,6 @@ if status == "PASS":
  st.dataframe(boq, use_container_width=True)
  st.metric("Estimated Cost (NGN)", f"{boq['Total (NGN)'].sum():,.0f}")
 
- # ---- Generate PDF Report (UPGRADED) ----
  if st.button("📄 Generate PDF Design Report"):
  ai = safe_chat(
  f"4-line engineering summary: load {design_w:.0f}W, Ib {ib:.1f}A, "
@@ -239,7 +215,6 @@ if status == "PASS":
  fallback="Design verified against BS 7671 copper PVC cable tables. "
  "All results within regulatory limits."
  )
-
  pdf_bytes = _build_report(
  phases, pf, ca, cg, vd_limit, length_m,
  total_w, design_w, ib, breaker, cable, vd_pct,
