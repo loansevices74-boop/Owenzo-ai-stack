@@ -5,9 +5,6 @@ from ai_router import safe_chat
 
 st.set_page_config(page_title="WireSafe", page_icon="⚡", layout="wide")
 
-# ============================================================
-# BS 7671 copper PVC: size -> (ampacity A, mV/A/m)
-# ============================================================
 CABLES = {1.5:(20,29), 2.5:(27,18), 4:(36,11), 6:(46,7.3), 10:(62,4.4),
           16:(80,2.8), 25:(101,1.75), 35:(126,1.25), 50:(151,0.93),
           70:(192,0.63), 95:(232,0.47), 120:(269,0.38)}
@@ -17,21 +14,15 @@ PRICE_M = {1.5:350, 2.5:550, 4:900, 6:1300, 10:2200, 16:3400, 25:5300,
 
 
 # ============================================================
-# UPGRADED PDF REPORT GENERATOR (defined BEFORE the UI uses it)
+# PDF REPORT GENERATOR (fpdf2-safe: NO ln= arguments)
 # ============================================================
 def _bs_ref(field):
-    refs = {
-        "mcb": "Table 41.3 / Appendix 3",
-        "cable": "Table 4E1B (Cu/PVC)",
-        "vd": "Table 4E1B volt-drop",
-        "correction": "App. 4 - Ca, Cg factors",
-    }
+    refs = {"mcb": "Table 41.3 / Appendix 3", "cable": "Table 4E1B (Cu/PVC)",
+            "vd": "Table 4E1B volt-drop", "correction": "App. 4 - Ca, Cg factors"}
     return refs.get(field, "BS 7671")
 
 
 class _WireSafePDF(FPDF):
-    """Custom FPDF with header (project/client/date) + footer (page numbers)."""
-
     def _init_(self, project="", client="", rpt_date=""):
         super()._init_()
         self.project = project or "-"
@@ -40,56 +31,57 @@ class _WireSafePDF(FPDF):
 
     def header(self):
         self.set_font("Helvetica", "B", 14)
-        self.cell(0, 8, "WireSafe Design Report", ln=1, align="C")
+        self.cell(0, 8, "WireSafe Design Report", align="C")
+        self.ln(8)
         self.set_font("Helvetica", "", 9)
-        self.cell(0, 5,
-                  f"Project: {self.project} | Client: {self.client} | Date: {self.rpt_date}",
-                  ln=1, align="C")
-        self.ln(2)
+        self.cell(0, 5, f"Project: {self.project} | Client: {self.client} | Date: {self.rpt_date}", align="C")
+        self.ln(7)
         self.set_draw_color(120, 120, 120)
-        self.line(10, 25, 200, 25)
+        self.line(10, self.get_y(), 200, self.get_y())
         self.ln(4)
 
     def footer(self):
         self.set_y(-12)
         self.set_font("Helvetica", "", 8)
-        self.cell(0, 5,
-                  f"Owens U. Oriaikhi (COREN R72198) | WireSafe Design Aid | Page {self.page_no()}",
-                  align="C")
+        self.cell(0, 5, f"Owens U. Oriaikhi (COREN R72198) | WireSafe Design Aid | Page {self.page_no()}", align="C")
 
 
 def _draw_kv_table(pdf, rows, col_w=(90, 100)):
     pdf.set_fill_color(230, 230, 230)
     pdf.cell(col_w[0], 6, "Parameter", border=1, fill=True)
-    pdf.cell(col_w[1], 6, "Value", border=1, fill=True, ln=1)
+    pdf.cell(col_w[1], 6, "Value", border=1, fill=True)
+    pdf.ln(6)
     for k, v in rows:
         pdf.cell(col_w[0], 6, k, border=1)
-        pdf.cell(col_w[1], 6, v, border=1, ln=1)
+        pdf.cell(col_w[1], 6, v, border=1)
+        pdf.ln(6)
 
 
 def _draw_results_table(pdf, rows, col_w=(45, 40, 55, 50)):
     pdf.set_fill_color(230, 230, 230)
     for i, h in enumerate(["Item", "Value", "BS 7671 Ref", "Status"]):
         pdf.cell(col_w[i], 6, h, border=1, fill=True)
-    pdf.ln()
+    pdf.ln(6)
     for item, val, ref, status in rows:
         pdf.cell(col_w[0], 6, item, border=1)
         pdf.cell(col_w[1], 6, val, border=1)
         pdf.cell(col_w[2], 6, ref, border=1)
         mark = "[x]" if status in ("PASS", "APPLIED") else "[ ]"
-        pdf.cell(col_w[3], 6, f"{mark} {status}", border=1, ln=1)
+        pdf.cell(col_w[3], 6, f"{mark} {status}", border=1)
+        pdf.ln(6)
 
 
 def _draw_boq_table(pdf, boq_df, col_w=(80, 25, 20, 65)):
     pdf.set_fill_color(230, 230, 230)
     for i, h in enumerate(["Item", "Qty", "Unit", "Total (NGN)"]):
         pdf.cell(col_w[i], 6, h, border=1, fill=True)
-    pdf.ln()
+    pdf.ln(6)
     for _, row in boq_df.iterrows():
         pdf.cell(col_w[0], 6, str(row["Item"]), border=1)
         pdf.cell(col_w[1], 6, str(row["Qty"]), border=1, align="R")
         pdf.cell(col_w[2], 6, str(row["Unit"]), border=1)
-        pdf.cell(col_w[3], 6, f"{int(row['Total (NGN)']):,}", border=1, align="R", ln=1)
+        pdf.cell(col_w[3], 6, f"{int(row['Total (NGN)']):,}", border=1, align="R")
+        pdf.ln(6)
 
 
 def _build_report(phases, pf, ca, cg, vd_limit, length_m,
@@ -99,58 +91,57 @@ def _build_report(phases, pf, ca, cg, vd_limit, length_m,
     pdf.add_page()
 
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "Design Inputs", ln=1)
+    pdf.cell(0, 7, "Design Inputs")
+    pdf.ln(7)
     pdf.set_font("Helvetica", "", 9)
     _draw_kv_table(pdf, [
-        ("Phases", f"{phases}"),
-        ("Power factor", f"{pf:.2f}"),
-        ("Circuit length", f"{length_m} m"),
-        ("Connected load", f"{total_w:,.0f} W"),
-        ("Design load", f"{design_w:,.0f} W"),
-        ("Design current Ib", f"{ib:.1f} A"),
-        ("Ca (ambient)", f"{ca:.2f}"),
-        ("Cg (grouping)", f"{cg:.2f}"),
-        ("V-drop limit", f"{vd_limit:.1f}%"),
-    ])
+        ("Phases", f"{phases}"), ("Power factor", f"{pf:.2f}"),
+        ("Circuit length", f"{length_m} m"), ("Connected load", f"{total_w:,.0f} W"),
+        ("Design load", f"{design_w:,.0f} W"), ("Design current Ib", f"{ib:.1f} A"),
+        ("Ca (ambient)", f"{ca:.2f}"), ("Cg (grouping)", f"{cg:.2f}"),
+        ("V-drop limit", f"{vd_limit:.1f}%")])
 
     pdf.ln(3)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "Results & Compliance Check", ln=1)
+    pdf.cell(0, 7, "Results & Compliance Check")
+    pdf.ln(7)
     pdf.set_font("Helvetica", "", 9)
     _draw_results_table(pdf, [
         ("MCB rating", f"{breaker} A", _bs_ref("mcb"), "PASS"),
         ("Cable size", f"{cable} mm2", _bs_ref("cable"), "PASS"),
         ("Voltage drop", f"{vd_pct:.2f}%", _bs_ref("vd"), "PASS" if vd_pct <= vd_limit else "CHECK"),
-        ("Correction", f"Ca={ca:.2f}, Cg={cg:.2f}", _bs_ref("correction"), "APPLIED"),
-    ])
+        ("Correction", f"Ca={ca:.2f}, Cg={cg:.2f}", _bs_ref("correction"), "APPLIED")])
 
     pdf.ln(3)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "Bill of Quantities (BOQ)", ln=1)
+    pdf.cell(0, 7, "Bill of Quantities (BOQ)")
+    pdf.ln(7)
     pdf.set_font("Helvetica", "", 9)
     _draw_boq_table(pdf, boq_df)
 
     pdf.ln(1)
     grand_total = int(boq_df["Total (NGN)"].sum())
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, f"Estimated Material Cost: NGN {grand_total:,}", ln=1, align="R")
+    pdf.cell(0, 7, f"Estimated Material Cost: NGN {grand_total:,}", align="R")
+    pdf.ln(7)
 
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "Engineering Summary", ln=1)
+    pdf.cell(0, 7, "Engineering Summary")
+    pdf.ln(7)
     pdf.set_font("Helvetica", "", 10)
     pdf.multi_cell(0, 6, eng_summary)
 
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(0, 6, "Verified by: Owens U. Oriaikhi (COREN Reg. No. R72198)", ln=1)
+    pdf.cell(0, 6, "Verified by: Owens U. Oriaikhi (COREN Reg. No. R72198)")
+    pdf.ln(6)
     pdf.set_font("Helvetica", "I", 8)
-    pdf.multi_cell(0, 5,
-                   "Disclaimer: This report is a design aid generated by WireSafe. "
-                   "Final verification and sign-off must be performed by a COREN-registered "
-                   "engineer before installation.")
+    pdf.multi_cell(0, 5, "Disclaimer: This report is a design aid generated by WireSafe. "
+                         "Final verification and sign-off must be performed by a COREN-registered "
+                         "engineer before installation.")
 
-    return bytes(pdf.output())   # bytes() = required by st.download_button
+    return bytes(pdf.output())
 
 
 # ============================================================
@@ -226,6 +217,6 @@ if status == "PASS":
             boq, ai['text'], project_name, client_name, report_date)
         st.download_button("📥 Download PDF Design Report", data=pdf_bytes,
                            file_name="WireSafe_Report.pdf", mime="application/pdf")
-        st.success("Report ready — click the Download button below.")
+        st.success("Report ready — click the Download button to save it to your system.")
 else:
     st.error("❌ No suitable cable — reduce load/length or split circuits.")
