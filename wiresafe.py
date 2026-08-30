@@ -23,12 +23,6 @@ def _bs_ref(field):
 class _WireSafePDF(FPDF):
  """Custom FPDF with header (project/client/date) + footer (page numbers)."""
 
- def _init_(self, project="", client="", rpt_date=""):
- super()._init_()
- self.project = project or "—"
- self.client = client or "—"
- self.rpt_date = str(rpt_date) if rpt_date else "—"
-
  def header(self):
  self.set_font("Helvetica", "B", 14)
  self.cell(0, 8, "WireSafe Design Report", ln=1, align="C")
@@ -93,7 +87,10 @@ def _build_report(phases, pf, ca, cg, vd_limit, length_m,
  boq_df, eng_summary, project, client, rpt_date):
  """Build the upgraded PDF and return raw bytes for st.download_button."""
 
- pdf = _WireSafePDF(project=project, client=client, rpt_date=rpt_date)
+ pdf = _WireSafePDF()
+ pdf.project = project or "—"
+ pdf.client = client or "—"
+ pdf.rpt_date = str(rpt_date) if rpt_date else "—"
  pdf.add_page()
 
  # 1. Design Inputs
